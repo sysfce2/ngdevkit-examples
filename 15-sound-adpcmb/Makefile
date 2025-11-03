@@ -1,4 +1,4 @@
-# Copyright (c) 2015-2023 Damien Ciabrini
+# Copyright (c) 2015-2025 Damien Ciabrini
 # This file is part of ngdevkit
 #
 # ngdevkit is free software: you can redistribute it and/or modify
@@ -14,124 +14,125 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with ngdevkit.  If not, see <http://www.gnu.org/licenses/>.
 
-all: cart nullbios
 
-include ../Makefile.config
 
-# Override default to a ROM cartridge layout that supports
-# both ADPCM-A and ADPCM-B in the same VROM chip, as all
-# the recent carts can demultiplex accesses from the YM2610
-# to a common ROM chip.
+all: cart bios
+
+# These are various variables that you might want to customize
+# based on your liking or your requirements.
+# location of generated and compiled content
+BUILDDIR=build
+# all directories that contain source to be compiled
+SRCDIRS=assets
+# default build flags, can be overriden per target
+CFLAGS=-I$(BUILDDIR) -std=c99 -fomit-frame-pointer -O2 -g
+LDFLAGS=
+Z80FLAGS=
+Z80LDFLAGS=
+
+# This is an autoconf-generated configuration for your environment
+# (ngdevkit path, OS-specific configs...)
+include config.mk
+
+# This defines the layout of your game cartridge
+# You can customize it to match your requirements
+include rom.mk
+
+# All the generic build targets (68k, Z80, assets, run)
+include build.mk
+
+# Some default targets for running your project via emulators
+include emu.mk
+
+
+
+# program ROM: your main program
+# Add your dependencies below to compile your sources into an ELF binary
+# that is used as the content of the program ROM (referenced by symbol PROM1)
+# 
+# Note: build rules (%.c -> %.o -> %.elf) are defined in Makefile.build
+ELF=$(BUILDDIR)/rom.elf
+$(ELF):	$(BUILDDIR)/main.o
+$(PROM1): $(ELF)
+
+
+
+# fixed tiles ROM: all your 8x8 pixel tiles for the fixed layer
+# Add your dependencies below to convert images to fixed tile binary data
+# and pack it into the fixed tile ROM (referenced by symbol SROM1)
+# 
+# By default, this makefile creates a tileset ROM with small and tall
+# latin characters for printing ASCII string, and tiles that are
+# displayed during the attract mode.
+# Note: build rules (%.gif -> %.fix) are defined in Makefile.build
+$(SROM1): $(BUILDDIR)/assets/base-srom-text-shadow.fix
+
+
+
+# sprite ROM: all your 16x16 pixel tiles for sprites
+# Add your dependencies below to convert images to fixed sprite binary data
+# and pack it into two separate sprite ROMs that hold odd and even bits of
+# color information (referenced by symbols CROM1 and CROM2)
 #
-GAMEROM=lastbld2
-MROMSIZE:=131072
-MROM=rom/243-m1.m1
-SROMSIZE:=262144
-SROM=rom/243-s1.s1
-PROMSIZE:=1048576
-PROM2SIZE:=4194304
-PROM1=rom/243-pg1.p1
-PROM2=rom/243-pg2.sp2
-PROM=$(PROM1) $(PROM2)
-VROMSIZE=4194304
-VROM1=rom/243-v1.v1
-VROM2=rom/243-v2.v2
-VROM3=rom/243-v3.v3
-VROM4=rom/243-v4.v4
-VROM=$(VROM1) $(VROM2) $(VROM3) $(VROM4)
-VROMTEMPLATE=$(subst 1,X,$(VROM1))
-CROMSIZE:=524288
-CROM1=rom/243-c1.c1
-CROM2=rom/243-c2.c2
-CROM3=rom/243-c3.c3
-CROM4=rom/243-c4.c4
-CROM5=rom/243-c5.c5
-CROM6=rom/243-c6.c6
-CROM=$(CROM1) $(CROM2) $(CROM3) $(CROM4) $(CROM5) $(CROM6)
-
-# ROM names and common targets
-include ../Makefile.common
-$(CART): $(PROM) $(CROM) $(SROM) $(VROM) $(MROM) | rom
-
-OBJS=main
-ELF=rom.elf
-Z80_OBJS=user_commands
-HEX=snd_driver.ihx
-SAMPLES=beat dance
-FIX_ASSETS=$(ASSETS)/rom/s1-shadow.bin
-
-$(ASSETS)/rom/c1.bin $(ASSETS)/rom/s1.bin:
-	$(MAKE) -C $(ASSETS)
+# By default, this makefile creates CROMs with tiles for displaying a ngdevkit
+# logo during the attract mode.
+# Note: build rules (%.gif -> %.c<1,2>) are defined in Makefile.build
+$(CROM1): $(BUILDDIR)/assets/base-crom-logo.c1
+$(CROM2): $(BUILDDIR)/assets/base-crom-logo.c2
 
 
-# MROM: Build a custom sound driver for the example
-# it consists is the nullsound library, plus specific
-# functions to trigger the configured actions (play samples)
+
+# sound driver ROM: nullsound + your configured sound commands
+# Add your dependencies below to compile your z80 sources into a HEX binary
+# that is used as the sound driver ROM (referenced by symbol MROM1)
 #
-$(HEX):	user_commands.rel
-	$(Z80SDLD) -b DATA=0xf800 -i $@ $(NGDKZ80LIBDIR)/nullsound.lib $^
+# By default, this makefile uses the empty sound driver provided by ngdevkit
+# Note: build rules (%.s -> %.o -> %.ihx) are defined in Makefile.build
+SOUND_DRIVER=$(BUILDDIR)/demo_driver.ihx
+$(MROM1): $(SOUND_DRIVER)
 
-user_commands.rel: user_commands.s samples.inc
-	$(Z80SDAS) -g -l -p -u -I$(NGDKZ80INCLUDEDIR)/nullsound -o $@ $<
-
-MROMSIZE:=131072
-$(MROM): $(HEX) | rom
-	$(Z80SDOBJCOPY) -I ihex -O binary $(HEX) $@ --pad-to $(MROMSIZE)
+$(SOUND_DRIVER): $(BUILDDIR)/user_commands.rel
 
 
 
-
-# sample ROM
+# sound FX ROM: all your ADPCM samples
+# Add your dependencies below to convert your samples into suitable
+# ADPCM data and pack it into the sound ROM (referenced by symbol VROM1)
 #
-# trim and convert input sounds to expected format
-samples/beat.wav: sfx/hip-hop-beat-n2-49252.mp3 | samples
-	$(SOX) -V1 $< -c 1 $@ reverse trim 0 2.290 reverse pad 0 0.41 speed 0.996555118
-samples/dance.wav: sfx/insect-dance-loop-93865.mp3 | samples
-	$(SOX) -V1 $< -c 1 $@ reverse trim 0 3.37 reverse speed 0.999802215
-
-samples/%.adpcmb: samples/%.wav | samples
-	$(ADPCMTOOL) -b -e $< -o $@ -v
-
-# ADPCM sample ROMs
-# only target VROM1, vromtool generates all VROMs automatically
-$(VROM1): samples-map.yaml samples.inc | rom
-	$(VROMTOOL) --roms -s $(VROMSIZE) $< -o $(VROMTEMPLATE) -n 4
-
-samples.inc: samples-map.yaml $(SAMPLES:%=samples/%.adpcmb)
-	$(VROMTOOL) --asm -s $(VROMSIZE) $< -o $(VROMTEMPLATE) -m $@
-
-# sprite ROM C1 C2: unused, common assets
-$(CROM1): $(ASSETS)/rom/c1.bin | rom
-	cp $(ASSETS)/rom/c1.bin	$@ && $(TRUNCATE) -s $(CROMSIZE) $@
-
-$(CROM2): $(ASSETS)/rom/c2.bin | rom
-	cp $(ASSETS)/rom/c2.bin	$@ && $(TRUNCATE) -s $(CROMSIZE) $@
-$(CROM3) $(CROM4) $(CROM5) $(CROM6): | rom
-	touch $@ && $(TRUNCATE) -s $(CROMSIZE) $@
+# Music and SFX assets can be managed with <> rather to generate
+# the dependencies automatically.
+# By default, no sample is used, so the VROM is empty
+# Note: build rules (%.wav-> %.adpcm<a,b>) are defined in Makefile.build
+$(VROM1): assets/samples-map.yaml
 
 
-# fixed tile ROM: fonts from common assets
-$(SROM): $(FIX_ASSETS) | rom
-	cat $(FIX_ASSETS) > $@ && $(TRUNCATE) -s $(SROMSIZE) $@
+
+# One-time asset preprocessing
+# Various assets may have to be processed before they can be used to
+# build your ROM, for example:
+#   . the ngdevkit assets must be converted to sprite and text tiles
+#   . converting your SFX assets from .mp3 into .wav so they can be
+#     processed by ngdevkit tools
+# To handle these pre-processing requirements, `make` automatically
+# runs into all subdirectories under ./setup/, so you get a chance
+# to preprocess what you need before anything is built.
+#
+# Other assets must be processed only once to generate source files
+# that gets built into your ROM, for example:
+#   . converting your musics from .fur to z80 code and data files
+#   . generating make dependencies to pack gfx or sound assets into
+#     the right ROM bank based on your input assets
+# Those actions can be achieved by creating custom make targets
+# that get invoked automatically when added to the variable below.
+CUSTOM_GENERATE_TARGETS=generate-sfx
+
+generate-sfx: $(BUILDDIR)/assets/samples.inc
+
+$(BUILDDIR)/assets/samples.inc: assets/samples-map.yaml
+	$(VROMTOOL) --asm -s $(VROMSIZE) $< -o $(VROM1) -m $@
 
 
-# program ROM
-$(ELF):	$(OBJS:%=%.o)
-	$(M68KGCC) -o $@ $^ `pkg-config --libs ngdevkit`
 
-%.o: %.c
-	$(M68KGCC) $(NGCFLAGS) -std=gnu99 -fomit-frame-pointer -g -c $< -o $@
-
-$(PROM1): $(ELF) | rom
-	$(M68KOBJCOPY) -O binary -S -R .comment --gap-fill 0xff --pad-to $(PROMSIZE) $< $@ && dd if=$@ of=$@ conv=notrunc,swab
-$(PROM2): | rom
-	dd if=/dev/zero bs=$(PROM2SIZE) count=1 of=$@
-
-
-clean:
-	rm -rf samples *.gif *.png *.pal *.adpcmb *.o *~ $(ELF) *.lst *.sym *.rel *.ihx *.rst tmp.* *.def *.map rom
-
-samples:
-	mkdir $@
-
-.PHONY: clean
+# a default `clean` target removes .o .elf and .ihx from the builddir
+# a default `distclean` target removes the build directory entirely
+# you can customize clean up by adding dependencies to those targets

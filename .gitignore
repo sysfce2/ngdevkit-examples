@@ -21,19 +21,7 @@ config.*
 Makefile.config
 
 # generated build files
-*.c1
-*.c2
-*.pal
-rom
-assets/*.bmp
-assets/*.png
-assets/*.gif
-sprites
-samples
-samples.inc
-04-palette/*.bin
-04-palette/*.gif
-09-horizontal-sync/precalc.inc
+build
 
 # generated ROM file
 *.zip
@@ -48,3 +36,11 @@ history/
 *~
 \#*#
 .#*
+
+# ngdevkit readme, makefiles and assets
+*/assets/README.md
+*/setup/README.md
+*/setup/ngdevkit-assets/
+*/setup/ngdevkit-assets/
+*/build.mk
+*/emu.mk

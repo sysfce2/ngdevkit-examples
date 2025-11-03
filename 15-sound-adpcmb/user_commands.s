@@ -64,7 +64,7 @@ cmd_jmptable::
 ;;; ADPCM-B sample data
 ;;;
         ;; offset of the ADPCM samples in VROM
-        .include "samples.inc"
+        .include "assets/samples.inc"
 
 ;;;
 ;;; Note on sample speed computation, e.g. with adpcm_b_beat_44

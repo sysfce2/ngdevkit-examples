@@ -1,4 +1,4 @@
-# Copyright (c) 2019 Damien Ciabrini
+# Copyright (c) 2019-2025 Damien Ciabrini
 # This file is part of ngdevkit
 #
 # ngdevkit is free software: you can redistribute it and/or modify
@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with ngdevkit.  If not, see <http://www.gnu.org/licenses/>.
 
-AC_INIT([ngdevkit-examples], [0.1])
+AC_INIT([ngdevkit-examples], [0.2])
 
 # This set of examples is meant to be built against this ngdevkit version
 NGDEVKIT_MIN_VERSION=0.4
@@ -39,6 +39,7 @@ AC_SUBST([ENABLE_MSYS2])
 
 # ngdevkit-toolkit common tools
 AC_PATH_PROG([nggcc], [m68k-neogeo-elf-gcc])
+AC_PATH_PROG([nggxx], [m68k-neogeo-elf-g++])
 AC_PATH_PROG([ngas], [m68k-neogeo-elf-as])
 AC_PATH_PROG([ngld], [m68k-neogeo-elf-ld])
 AC_PATH_PROG([ngar], [m68k-neogeo-elf-ar])
@@ -131,8 +132,10 @@ AC_SUBST([NSSTOOL])
 AC_SUBST([SOUNDTOOL])
 
 dnl External tools for the examples
+AC_PATH_PROGS([make], [gmake make], [no])
+AC_PATH_PROG([pkgconfig], [pkg-config])
 AC_PATH_PROG([zip], [zip])
-AC_PATH_PROG([convert], [convert])
+AC_PATH_PROG([convert], [magick])
 AC_PATH_PROG([sox], [sox])
 AC_PATH_PROG([rsync], [rsync])
 
@@ -142,7 +145,7 @@ else
 gngeo_name=ngdevkit-gngeo
 fi
 
-AC_PATH_PROG([gngeo], [$gngeo_name])
+AC_PATH_PROG([gngeo], [ngdevkit-gngeo])
 # escape potential spaces from path
 gngeo=$(echo "$gngeo" | sed 's/ /\\ /g')
 
@@ -231,6 +234,15 @@ AC_SUBST([SHADER])
 
 
 AC_CONFIG_FILES([
- Makefile.config
+ config.mk
 ])
 AC_OUTPUT
+
+echo "Preparing examples"
+for ex in `${make} _examples`; do
+    echo $ex
+    rsync -q 00-template/{build,emu}.mk $ex
+    rsync -q config.mk $ex/config.mk
+    rsync -q -r 00-template/assets/ $ex/assets/
+    rsync -q -r 00-template/setup/ $ex/setup/
+done

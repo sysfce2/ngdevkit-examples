@@ -34,7 +34,7 @@
 // by setting up a jump table accessible from a
 // global variable that is stored in the bank-switched
 // address space from P-ROM2.
-#include <example_interface.h>
+#include "example_interface.h"
 extern const bank_interface_t example_interface;
 
 

@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2022 Damien Ciabrini
+# Copyright (c) 2015-2025 Damien Ciabrini
 # This file is part of ngdevkit
 #
 # ngdevkit is free software: you can redistribute it and/or modify
@@ -14,118 +14,141 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with ngdevkit.  If not, see <http://www.gnu.org/licenses/>.
 
-all: cart nullbios
 
-include ../Makefile.config
 
-# Override default to use a ROM that is known to have two P-ROMs
-# and the second P-ROM being used for bankswitching.
-GAMEROM=pulstar
-MROM=rom/089-m1.m1
-SROM=rom/089-s1.s1
-PROM1=rom/089-p1.p1
-PROM2=rom/089-p2.sp2
-PROM=$(PROM1) $(PROM2)
-VROM1=rom/089-v1.v1
-VROM2=rom/089-v2.v2
-VROM=$(VROM1) $(VROM2)
-CROM1=rom/089-c1.c1
-CROM2=rom/089-c2.c2
-CROM3=rom/089-c3.c3
-CROM4=rom/089-c4.c4
-CROM5=rom/089-c5.c5
-CROM6=rom/089-c6.c6
-CROM7=rom/089-c7.c7
-CROM8=rom/089-c8.c8
-CROM=$(CROM1) $(CROM2) $(CROM3) $(CROM4) $(CROM5) $(CROM6) $(CROM7) $(CROM8)
+all: cart bios
 
-# ROM names and common targets
-include ../Makefile.common
-$(CART): $(PROM) $(CROM) $(SROM) $(VROM) $(MROM) | rom
+# These are various variables that you might want to customize
+# based on your liking or your requirements.
+# location of generated and compiled content
+BUILDDIR=build
+# all directories that contain source to be compiled
+SRCDIRS=assets
+# default build flags, can be overriden per target
+CFLAGS=-I$(BUILDDIR) -std=c99 -fomit-frame-pointer -g
+LDFLAGS=-Wl,--enable-non-contiguous-regions
+Z80FLAGS=
+Z80LDFLAGS=
 
-OBJS_COMMON=\
-  main
+# This is an autoconf-generated configuration for your environment
+# (ngdevkit path, OS-specific configs...)
+include config.mk
 
-# All files whose path or name contains '__bank' get automatically
-# linked into the P-ROM2 address space.
-OBJS_0=\
-  $(OBJS_COMMON) \
-  impl__bank0
+# This defines the layout of your game cartridge
+# You can customize it to match your requirements
+include rom.mk
 
-OBJS_1=\
-  $(OBJS_COMMON) \
-  impl__bank1
+# All the generic build targets (68k, Z80, assets, run)
+include build.mk
 
-ELF_0=rom0.elf
-ELF_1=rom1.elf
+# Some default targets for running your project via emulators
+include emu.mk
 
-FIX_ASSETS=$(ASSETS)/rom/s1-shadow.bin
 
-$(ASSETS)/rom/c1.bin $(ASSETS)/rom/s1.bin:
-	$(MAKE) -C $(ASSETS)
 
-# Enable multiple .text segments explicitly
-$(ELF_0): $(OBJS_0:%=%.o)
-	$(M68KGCC) -o $@ $^ `pkg-config --libs ngdevkit` -Wl,--enable-non-contiguous-regions
+# program ROM: your main program
+# Add your dependencies below to compile your sources into an ELF binary
+# that is used as the content of the program ROM (referenced by symbol PROM1)
+# 
+# Note: build rules (%.c -> %.o -> %.elf) are defined in Makefile.build
 
-$(ELF_1): $(OBJS_1:%=%.o)
-	$(M68KGCC) -o $@ $^ `pkg-config --libs ngdevkit` -Wl,--enable-non-contiguous-regions
+# Bankswitching program ROM is achieved by building several ELF files
+#  - The main ELF file contains the common code that is not bank-switched,
+#    it gets build and converted into a regular PROM
+#  - For every bank, a dedicated ELF file is built that contains only
+#    code that belonds to the bank. The ngdevkit linkscript achieves that
+#    by automatically linking all files whose path or name contains '__bank'
+#    into the bank-switch P-ROM address space
 
-%.o: %.c
-	$(M68KGCC) `pkg-config --cflags ngdevkit` -I. -std=c99 -fomit-frame-pointer -g -c $< -o $@
+ELF_0=$(BUILDDIR)/rom0.elf
+$(ELF_0): $(BUILDDIR)/main.o
+$(ELF_0): $(BUILDDIR)/impl__bank0.o
 
-# sound driver ROM: ngdevkit's nullsound
-MROMSIZE:=131072
-$(MROM): | rom
-	$(Z80SDOBJCOPY) -I ihex -O binary $(NGDKSHAREDIR)/nullsound_driver.ihx $@ --pad-to $(MROMSIZE)
+ELF_1=$(BUILDDIR)/rom1.elf
+$(ELF_1): $(BUILDDIR)/main.o
+$(ELF_1): $(BUILDDIR)/impl__bank1.o
 
-# sample ROM: empty
-VROMSIZE:=4194304
-$(VROM1) $(VROM2): | rom
-	dd if=/dev/zero bs=$(VROMSIZE) count=1 of=$@
+# The first P-ROM will hold only common code, i.e. code from the first ELF
+# minus code from the bank-switch segment.
+$(PROM1): $(ELF_0)
 
-# sprite ROM C1 C2: unused, common assets
-CROMSIZE16:=4194304
-CROMSIZE78:=2097152
-$(CROM1): $(ASSETS)/rom/c1.bin | rom
-	cp $(ASSETS)/rom/c1.bin	$@ && $(TRUNCATE) -s $(CROMSIZE16) $@
+# The second P-ROM contains is a concatenation of the the banks. In this
+# example, this means bank code from ELF0 and ELF1
+# Note: build rules (%_bank<x> -> prom) are defined in Makefile.build
+$(PROM2)_bank0: $(ELF_0)
+$(PROM2)_bank1: $(ELF_1)
+$(PROM2): $(PROM2)_bank0 $(PROM2)_bank1
 
-$(CROM2): $(ASSETS)/rom/c2.bin | rom
-	cp $(ASSETS)/rom/c2.bin	$@ && $(TRUNCATE) -s $(CROMSIZE16) $@
 
-$(CROM3) $(CROM4) $(CROM5) $(CROM6): | rom
-	touch $@ && $(TRUNCATE) -s $(CROMSIZE16) $@
 
-$(CROM7) $(CROM8): | rom
-	touch $@ && $(TRUNCATE) -s $(CROMSIZE78) $@
+# fixed tiles ROM: all your 8x8 pixel tiles for the fixed layer
+# Add your dependencies below to convert images to fixed tile binary data
+# and pack it into the fixed tile ROM (referenced by symbol SROM1)
+# 
+# By default, this makefile creates a tileset ROM with small and tall
+# latin characters for printing ASCII string, and tiles that are
+# displayed during the attract mode.
+# Note: build rules (%.gif -> %.fix) are defined in Makefile.build
+$(SROM1): $(BUILDDIR)/assets/base-srom-text-shadow.fix
 
-# fixed tile ROM: fonts from common assets
-SROMSIZE:=131072
-$(SROM): $(FIX_ASSETS) | rom
-	cat $(FIX_ASSETS) > $@ && $(TRUNCATE) -s $(SROMSIZE) $@
 
-# program ROMs
-PROMSIZE:=1048576
-# We generate two different ROM files out two ELF programs which
-# share a common part.
-# The first ROM file only contains what was linked to segment .text
-# this is common in both ELF files
-$(PROM1): $(ELF_0) | rom
-	$(M68KOBJCOPY) -O binary -S -R .text2 -R .comment --gap-fill 0xff --pad-to $(PROMSIZE) $< $@ && dd if=$@ of=$@ conv=notrunc,swab
 
-# The second ROM is the concatenation of all .text2 segments
-# from all ELF files. It is a series of 1MB chunks, that are
-# bankswitched at runtime.
-$(PROM2:%.sp2=%)_bank0: $(ELF_0) | rom
-	$(M68KOBJCOPY) -O binary -j .text2 --gap-fill 0xff --pad-to $$((0x200000+$(PROMSIZE))) $< $@ && dd if=$@ of=$@ conv=notrunc,swab
+# sprite ROM: all your 16x16 pixel tiles for sprites
+# Add your dependencies below to convert images to fixed sprite binary data
+# and pack it into two separate sprite ROMs that hold odd and even bits of
+# color information (referenced by symbols CROM1 and CROM2)
+#
+# By default, this makefile creates CROMs with tiles for displaying a ngdevkit
+# logo during the attract mode.
+# Note: build rules (%.gif -> %.c<1,2>) are defined in Makefile.build
+$(CROM1): $(BUILDDIR)/assets/base-crom-logo.c1
+$(CROM2): $(BUILDDIR)/assets/base-crom-logo.c2
 
-$(PROM2:%.sp2=%)_bank1: $(ELF_1) | rom
-	$(M68KOBJCOPY) -O binary -j .text2 --gap-fill 0xff --pad-to $$((0x200000+$(PROMSIZE))) $< $@ && dd if=$@ of=$@ conv=notrunc,swab
 
-$(PROM2): $(PROM2:%.sp2=%)_bank0 $(PROM2:%.sp2=%)_bank1 | rom
-	cat $^ > $@
 
-clean:
-	rm -f *.o *~ $(ELF_0) $(ELF_1) tmp.* rom/*.*
+# sound driver ROM: nullsound + your configured sound commands
+# Add your dependencies below to compile your z80 sources into a HEX binary
+# that is used as the sound driver ROM (referenced by symbol MROM1)
+#
+# By default, this makefile uses the empty sound driver provided by ngdevkit
+# Note: build rules (%.s -> %.o -> %.ihx) are defined in Makefile.build
+SOUND_DRIVER=$(NGSHAREDIR)/nullsound_driver.ihx
+$(MROM1): $(SOUND_DRIVER)
 
-.PHONY: clean
+
+
+# sound FX ROM: all your ADPCM samples
+# Add your dependencies below to convert your samples into suitable
+# ADPCM data and pack it into the sound ROM (referenced by symbol VROM1)
+#
+# Music and SFX assets can be managed with <> rather to generate
+# the dependencies automatically.
+# By default, no sample is used, so the VROM is empty
+# Note: build rules (%.wav-> %.adpcm<a,b>) are defined in Makefile.build
+
+
+
+# One-time asset preprocessing
+# Various assets may have to be processed before they can be used to
+# build your ROM, for example:
+#   . the ngdevkit assets must be converted to sprite and text tiles
+#   . converting your SFX assets from .mp3 into .wav so they can be
+#     processed by ngdevkit tools
+# To handle these pre-processing requirements, `make` automatically
+# runs into all subdirectories under ./setup/, so you get a chance
+# to preprocess what you need before anything is built.
+#
+# Other assets must be processed only once to generate source files
+# that gets built into your ROM, for example:
+#   . converting your musics from .fur to z80 code and data files
+#   . generating make dependencies to pack gfx or sound assets into
+#     the right ROM bank based on your input assets
+# Those actions can be achieved by creating custom make targets
+# that get invoked automatically when added to the variable below.
+CUSTOM_GENERATE_TARGETS=
+
+
+
+# a default `clean` target removes .o .elf and .ihx from the builddir
+# a default `distclean` target removes the build directory entirely
+# you can customize clean up by adding dependencies to those targets

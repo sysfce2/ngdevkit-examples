@@ -18,7 +18,7 @@
 
 #include <ngdevkit/neogeo.h>
 #include <ngdevkit/bios-ram.h>
-#include <ngdevkit/backup-ram.h>
+#include <ngdevkit/bios-backup-ram.h>
 #include <ngdevkit/ng-fix.h>
 #include <ngdevkit/ng-video.h>
 #include <stdio.h>

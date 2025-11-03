@@ -1,4 +1,4 @@
-# Copyright (c) 2015-2020 Damien Ciabrini
+# Copyright (c) 2015-2025 Damien Ciabrini
 # This file is part of ngdevkit
 #
 # ngdevkit is free software: you can redistribute it and/or modify
@@ -14,94 +14,125 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with ngdevkit.  If not, see <http://www.gnu.org/licenses/>.
 
-all: cart nullbios
-
-include ../Makefile.config
-
-# ROM names and common targets
-include ../Makefile.common
-$(CART): $(PROM) $(CROM1) $(CROM2) $(SROM) $(VROM) $(MROM) | rom
-
-OBJS=main
-ELF=rom.elf
-Z80_OBJS=user_commands
-HEX=snd_driver.ihx
-SAMPLES=woosh lefthook lightbulbbreaking
-FIX_ASSETS=$(ASSETS)/rom/s1-shadow.bin
-
-$(ASSETS)/rom/c1.bin $(ASSETS)/rom/s1.bin:
-	$(MAKE) -C $(ASSETS)
 
 
-# MROM: Build a custom nullsound driver for the example
-# it consists is the nullsound template, plus specific
-# functions to trigger the configured actions (play samples)
+all: cart bios
+
+# These are various variables that you might want to customize
+# based on your liking or your requirements.
+# location of generated and compiled content
+BUILDDIR=build
+# all directories that contain source to be compiled
+SRCDIRS=assets
+# default build flags, can be overriden per target
+CFLAGS=-I$(BUILDDIR) -std=c99 -fomit-frame-pointer -O2 -g
+LDFLAGS=
+Z80FLAGS=
+Z80LDFLAGS=
+
+# This is an autoconf-generated configuration for your environment
+# (ngdevkit path, OS-specific configs...)
+include config.mk
+
+# This defines the layout of your game cartridge
+# You can customize it to match your requirements
+include rom.mk
+
+# All the generic build targets (68k, Z80, assets, run)
+include build.mk
+
+# Some default targets for running your project via emulators
+include emu.mk
+
+
+
+# program ROM: your main program
+# Add your dependencies below to compile your sources into an ELF binary
+# that is used as the content of the program ROM (referenced by symbol PROM1)
+# 
+# Note: build rules (%.c -> %.o -> %.elf) are defined in Makefile.build
+ELF=$(BUILDDIR)/rom.elf
+$(ELF):	$(BUILDDIR)/main.o
+$(PROM1): $(ELF)
+
+
+
+# fixed tiles ROM: all your 8x8 pixel tiles for the fixed layer
+# Add your dependencies below to convert images to fixed tile binary data
+# and pack it into the fixed tile ROM (referenced by symbol SROM1)
+# 
+# By default, this makefile creates a tileset ROM with small and tall
+# latin characters for printing ASCII string, and tiles that are
+# displayed during the attract mode.
+# Note: build rules (%.gif -> %.fix) are defined in Makefile.build
+$(SROM1): $(BUILDDIR)/assets/base-srom-text-shadow.fix
+
+
+
+# sprite ROM: all your 16x16 pixel tiles for sprites
+# Add your dependencies below to convert images to fixed sprite binary data
+# and pack it into two separate sprite ROMs that hold odd and even bits of
+# color information (referenced by symbols CROM1 and CROM2)
 #
-$(HEX):	user_commands.rel
-	$(Z80SDLD) -b DATA=0xf800 -i $@ $(NGDKZ80LIBDIR)/nullsound.lib $^
-
-user_commands.rel: user_commands.s samples.inc
-	$(Z80SDAS) -g -l -p -u -I$(NGDKZ80INCLUDEDIR)/nullsound -o $@ $<
-
-MROMSIZE:=131072
-$(MROM): $(HEX) | rom
-	$(Z80SDOBJCOPY) -I ihex -O binary $(HEX) $@ --pad-to $(MROMSIZE)
+# By default, this makefile creates CROMs with tiles for displaying a ngdevkit
+# logo during the attract mode.
+# Note: build rules (%.gif -> %.c<1,2>) are defined in Makefile.build
+$(CROM1): $(BUILDDIR)/assets/base-crom-logo.c1
+$(CROM2): $(BUILDDIR)/assets/base-crom-logo.c2
 
 
 
-# sample ROM
+# sound driver ROM: nullsound + your configured sound commands
+# Add your dependencies below to compile your z80 sources into a HEX binary
+# that is used as the sound driver ROM (referenced by symbol MROM1)
 #
-# trim and convert input sounds to expected format
-samples/woosh.wav: sfx/woosh.mp3 | samples
-	$(SOX) -V1 $< -c 1 -r 18500 $@ silence 1 0.01 0.1% reverse silence 1 0.05 0.5% reverse
-samples/lefthook.wav: sfx/lefthook.mp3 | samples
-	$(SOX) -V1 $< -c 1 -r 18500 $@ silence 1 0.1 1% reverse silence 1 0.2 1% reverse
-samples/lightbulbbreaking.wav: sfx/lightbulbbreaking.mp3 | samples
-	$(SOX) -V1 $< -c 1 -r 18500 $@ silence 1 0.1 1% reverse silence 1 0.1 1% reverse
+# By default, this makefile uses the empty sound driver provided by ngdevkit
+# Note: build rules (%.s -> %.o -> %.ihx) are defined in Makefile.build
+SOUND_DRIVER=$(BUILDDIR)/demo_driver.ihx
+$(MROM1): $(SOUND_DRIVER)
 
-samples/%.adpcma: samples/%.wav | samples
-	$(ADPCMTOOL) -e $< -o $@ -v
-
-# ADPCM sample ROM
-VROMSIZE=524288
-$(VROM): samples-map.yaml samples.inc | rom
-	$(VROMTOOL) --roms -s $(VROMSIZE) $< -o $(VROM)
-
-samples.inc: samples-map.yaml $(SAMPLES:%=samples/%.adpcma)
-	$(VROMTOOL) --asm -s $(VROMSIZE) $< -o $(VROM) -m $@
+$(SOUND_DRIVER): $(BUILDDIR)/user_commands.rel
 
 
-# sprite ROM C1 C2: unused, common assets
-CROMSIZE:=1048576
-$(CROM1): $(ASSETS)/rom/c1.bin | rom
-	cp $(ASSETS)/rom/c1.bin	$@ && $(TRUNCATE) -s $(CROMSIZE) $@
 
-$(CROM2): $(ASSETS)/rom/c2.bin | rom
-	cp $(ASSETS)/rom/c2.bin	$@ && $(TRUNCATE) -s $(CROMSIZE) $@
-
-
-# fixed tile ROM: fonts from common assets
-SROMSIZE:=131072
-$(SROM): $(FIX_ASSETS) | rom
-	cat $(FIX_ASSETS) > $@ && $(TRUNCATE) -s $(SROMSIZE) $@
+# sound FX ROM: all your ADPCM samples
+# Add your dependencies below to convert your samples into suitable
+# ADPCM data and pack it into the sound ROM (referenced by symbol VROM1)
+#
+# Music and SFX assets can be managed with <> rather to generate
+# the dependencies automatically.
+# By default, no sample is used, so the VROM is empty
+# Note: build rules (%.wav-> %.adpcm<a,b>) are defined in Makefile.build
+$(VROM1): assets/samples-map.yaml
 
 
-# program ROM
-$(ELF):	$(OBJS:%=%.o)
-	$(M68KGCC) -o $@ $^ `pkg-config --libs ngdevkit`
 
-%.o: %.c
-	$(M68KGCC) $(NGCFLAGS) -std=gnu99 -fomit-frame-pointer -g -c $< -o $@
+# One-time asset preprocessing
+# Various assets may have to be processed before they can be used to
+# build your ROM, for example:
+#   . the ngdevkit assets must be converted to sprite and text tiles
+#   . converting your SFX assets from .mp3 into .wav so they can be
+#     processed by ngdevkit tools
+# To handle these pre-processing requirements, `make` automatically
+# runs into all subdirectories under ./setup/, so you get a chance
+# to preprocess what you need before anything is built.
+#
+# Other assets must be processed only once to generate source files
+# that gets built into your ROM, for example:
+#   . converting your musics from .fur to z80 code and data files
+#   . generating make dependencies to pack gfx or sound assets into
+#     the right ROM bank based on your input assets
+# Those actions can be achieved by creating custom make targets
+# that get invoked automatically when added to the variable below.
+ CUSTOM_GENERATE_TARGETS=generate-sfx
 
-PROMSIZE:=524288
-$(PROM): $(ELF) | rom
-	$(M68KOBJCOPY) -O binary -S -R .comment --gap-fill 0xff --pad-to $(PROMSIZE) $< $@ && dd if=$@ of=$@ conv=notrunc,swab
+generate-sfx: $(BUILDDIR)/assets/samples.inc
+
+$(BUILDDIR)/assets/samples.inc: assets/samples-map.yaml
+	$(VROMTOOL) --asm -s $(VROMSIZE) $< -o $(VROM1) -m $@
 
 
-clean:
-	rm -rf samples samples.inc *.adpcma *.o *~ $(ELF) *.def *.lst *.sym *.rel *.ihx *.rst tmp.* rom
 
-samples:
-	mkdir $@
-
-.PHONY: clean
+# a default `clean` target removes .o .elf and .ihx from the builddir
+# a default `distclean` target removes the build directory entirely
+# you can customize clean up by adding dependencies to those targets

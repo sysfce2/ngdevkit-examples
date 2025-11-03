@@ -31,23 +31,23 @@ EXAMPLES = \
 14-prom-bankswitch \
 15-sound-adpcmb \
 16-sound-music \
+17-hello-c++ \
 
-include Makefile.config
+include config.mk
 
 all:
-	for i in $(EXAMPLES); do $(MAKE) -C $$i cart nullbios || exit 1; done
+	for i in $(EXAMPLES); do $(MAKE) -C $$i || exit 1; done
 
 clean:
 	for i in $(EXAMPLES); do $(MAKE) -C $$i clean; done
-	$(MAKE) -C assets clean
 
 distclean:
 	-$(MAKE) clean
 	find . -name '*~' -delete
-	rm -rf config.log config.status configure aclocal.m4 Makefile.config autom4te.cache
+	rm -rf config.log config.status configure aclocal.m4 config.mk autom4te.cache
 
-
-include Makefile.common
+_examples:
+	@echo $(EXAMPLES)
 
 # ngdevkit-gngeo config targets
 all: build-gngeo-config
@@ -100,4 +100,4 @@ endif
 
 
 
-.PHONY: all clean distclean
+.PHONY: all clean distclean _examples

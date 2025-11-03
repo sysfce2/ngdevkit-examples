@@ -12,10 +12,10 @@
 #
 - adpcm_a:
     name: hook
-    uri: file://samples/lefthook.adpcma
+    uri: file://assets/lefthook.wav
 - adpcm_a:
     name: break
-    uri: file://samples/lightbulbbreaking.adpcma
+    uri: file://assets/lightbulbbreaking.wav
 - adpcm_a:
     name: woosh
-    uri: file://samples/woosh.adpcma
+    uri: file://assets/woosh.wav

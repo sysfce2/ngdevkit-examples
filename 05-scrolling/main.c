@@ -58,9 +58,9 @@ const u16 clut[][16]= {
     {0x8000, 0x0fff, 0x0333, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
      0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000},
     /// sprite palettes
-    #include "sprites/back.pal"
-    #include "sprites/forest.pal"
-    #include "sprites/front.pal"
+    #include "assets/back.pal"
+    #include "assets/forest.pal"
+    #include "assets/front.pal"
 };
 
 void init_palette() {

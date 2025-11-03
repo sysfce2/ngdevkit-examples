@@ -94,7 +94,7 @@ def main():
     dst.blit(talltxt, (0,8))
     dst.blit(talltxt, (0,24))
     # Inject a new message
-    blit_msg(dst, biostxt, "16BITS POWERED ", MAX_330_MEGA)
+    blit_msg(dst, biostxt, "16-BIT POWERED ", MAX_330_MEGA)
     blit_msg(dst, biostxt, "GAME DEVELOPMENT", PRO_GEAR_SPEC)
     # Some tiles need to be empty no matter what
     dst.blit(dst, (ord('@')*8, 16), area = (0, 0, 8, 8))

@@ -12,7 +12,7 @@
 #
 - adpcm_b:
     name: beat
-    uri: file://samples/beat.adpcmb
+    uri: file://assets/beat.wav
 - adpcm_b:
     name: dance
-    uri: file://samples/dance.adpcmb
+    uri: file://assets/dance.wav

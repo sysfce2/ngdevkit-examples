@@ -58,7 +58,7 @@ snd_command_06_play_sample_break:
 ;;; ADPCM-A sample data
 ;;;
         ;; offset of the ADPCM samples in VROM
-        .include "samples.inc"
+        .include "assets/samples.inc"
 
 adpcm_a_woosh:
         .db     WOOSH_START_LSB         ;

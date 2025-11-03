@@ -18,6 +18,8 @@
 
 #include <ngdevkit/neogeo.h>
 #include <ngdevkit/bios-ram.h>
+#include <ngdevkit/bios-backup-ram.h>
+#include <ngdevkit/bios-calls.h>
 #include <ngdevkit/ng-fix.h>
 #include <ngdevkit/ng-video.h>
 #include <stdio.h>
@@ -135,7 +137,7 @@ void coin_sound(void) {
 int main(void) {
     init_screen();
     demo_mode();
-    // when demo ends, only run game is start was pressed
+    // when demo ends, only run game if start was pressed
     if (bios_user_mode == USER_MODE_GAME) game_mode();
     // returning to the BIOS to start demo again
     return 0;
@@ -188,6 +190,8 @@ void demo_mode() {
     while(demo_end-- && (bios_user_mode != USER_MODE_GAME)) {
         game_status();
         update_start_message();
+        sprintf(str,"%1x",*((volatile u8*)REG_STATUS_A));
+        ng_center_text(13,0,str);
         ng_wait_vblank();
     }
 }
@@ -203,7 +207,7 @@ void title_mode() {
         game_status();
         sprintf(str, "%02x", bios_compulsion_timer);
         ng_center_text(23,0,str);
-        sprintf(str, "credit: %x ", *(u8*)0xd00034);
+        sprintf(str, "credit: %x ", bram_p1_credits_bcd);
         ng_center_text(28,0,str);
         ng_wait_vblank();
     }
@@ -251,6 +255,7 @@ void update_players_status() {
 
 void game_mode() {
     ng_cls();
+    bios_fix_clear();
     // in-game backdrop color
     *((volatile u16*)0x401ffe)=0x488;
 

@@ -34,7 +34,7 @@ extern u8 bios_p1change;
 
 
 /// z80 sound driver communication
-#define REG_SOUND ((u8*)0x320000)
+#define REG_SOUND ((volatile u8*)0x320000)
 
 const u16 clut[][16]= {
     /// first 16 colors palette for the fix tiles
