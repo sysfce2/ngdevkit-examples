@@ -26,9 +26,13 @@ BUILDDIR=build
 SRCDIRS=assets
 # default build flags, can be overriden per target
 CFLAGS=-I$(BUILDDIR) -fomit-frame-pointer -O2 -g
-LDFLAGS=
+LDFLAGS=-Wl,--defsym,rom_NGH_ID=1338 -Wl,--defsym,rom_eye_catcher_mode=0
 Z80FLAGS=
 Z80LDFLAGS=
+
+# This example uses a memory card, set its name here, it will be automatically
+# picked up by the emulators, as defined in emu.mk below
+MEMCARD=card.mc
 
 # This is an autoconf-generated configuration for your environment
 # (ngdevkit path, OS-specific configs...)
@@ -36,6 +40,10 @@ include config.mk
 
 # This defines the layout of your game cartridge
 # You can customize it to match your requirements
+# Name of the rom file created
+GAMEROM=18_memory_card
+# Game title, long description
+GAMETITLE=Accessing the memory card
 include rom.mk
 
 # All the generic build targets (68k, Z80, assets, run)
@@ -88,7 +96,7 @@ $(CROM2): $(BUILDDIR)/assets/base-crom-logo.c2
 #
 # By default, this makefile uses the empty sound driver provided by ngdevkit
 # Note: build rules (%.s -> %.o -> %.ihx) are defined in Makefile.build
-SOUND_DRIVER=$(NGSHAREDIR)/nullsound_driver.ihx
+SOUND_DRIVER=$(BUILDDIR)/assets/base-sound-driver.ihx
 $(MROM1): $(SOUND_DRIVER)
 
 
