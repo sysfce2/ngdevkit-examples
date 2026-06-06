@@ -41,5 +41,54 @@ jobs:
           sudo apt-get install -y ngdevkit ngdevkit-gngeo
           sudo apt-get install -y pkg-config autoconf automake rsync zip imagemagick sox libsox-fmt-mp3
 
-      - name: Build ngdevkit
+      - name: Build examples
+        run: ./.github/scripts/build.sh
+
+  win:
+    name: "Windows native MSYS2 build"
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install:
+            git autoconf automake make zip rsync pactoys
+            mingw-w64-ucrt-x86_64-pkg-config
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-python-pillow
+            mingw-w64-ucrt-x86_64-python-ruamel-yaml
+
+      - name: Install ngdevkit dependencies
+        run: |
+          echo -e "[ngdevkit]\nSigLevel = Optional TrustAll\nServer = https://dciabrin.net/msys2-ngdevkit/\$arch" >> /etc/pacman.conf
+          pacman -Sy
+          pacboy -S --noconfirm ngdevkit:u ngdevkit-gngeo:u toolchain:u zlib:u sox:u imagemagick:u
+
+      - name: Build examples
+        run: ./.github/scripts/build.sh
+
+  macos:
+    name: "macOS build"
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Dependencies
+        run: |
+          brew tap dciabrin/ngdevkit
+          brew install automake zip pkg-config
+          brew install ngdevkit ngdevkit-gngeo imagemagick sox glew make
+
+      - name: Build examples
         run: ./.github/scripts/build.sh

@@ -2,4 +2,5 @@
 set -e
 autoreconf -I. -iv
 ./configure
-make
+MAKE=$(which gmake make | head -1)
+$MAKE
